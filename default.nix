@@ -160,21 +160,12 @@ let
         let
           parentNode = allNodes.${getInputByPath lockFile.root node.parent};
 
-          flakeDir =
-            let
-              dir = node.locked.path or "";
-              parentDir = parentNode.flakeDir;
-            in
-            if node ? parent
-            then parentDir + ("/" + dir)
-            else dir;
-
           sourceInfo =
             if key == lockFile.root then rootSrc
             else if node.locked.type == "path" && builtins.substring 0 1 node.locked.path != "/"
             then
               parentNode.sourceInfo // {
-                outPath = parentNode.sourceInfo.outPath + ("/" + flakeDir);
+                outPath = parentNode.result.outPath + ("/" + node.locked.path);
               }
             else fetchTree (node.info or {} // removeAttrs node.locked ["dir"]);
 
@@ -232,8 +223,6 @@ let
               result
             else
               sourceInfo;
-
-          inherit flakeDir sourceInfo;
         }
       )
       lockFile.nodes;
