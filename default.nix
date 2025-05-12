@@ -125,9 +125,10 @@ let
     isGit = builtins.pathExists (src + "/.git");
     isShallow = builtins.pathExists (src + "/.git/shallow");
 
-  in
-    { lastModified = 0; lastModifiedDate = formatSecondsSinceEpoch 0; }
+    sourceInfo = { lastModified = 0; lastModifiedDate = formatSecondsSinceEpoch 0; }
       // (if src ? outPath then src else tryFetchGit src);
+  in
+  sourceInfo // { inherit sourceInfo; };
 
   # Format number of seconds in the Unix epoch as %Y%m%d%H%M%S.
   formatSecondsSinceEpoch = t:
