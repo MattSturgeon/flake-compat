@@ -158,9 +158,24 @@ let
     builtins.mapAttrs
       (key: node:
         let
+          parentNode = allNodes.${getInputByPath lockFile.root node.parent};
+
+          flakeDir =
+            let
+              dir = node.locked.path or "";
+              parentDir = parentNode.flakeDir;
+            in
+            if node ? parent
+            then parentDir + ("/" + dir)
+            else dir;
+
           sourceInfo =
-            if key == lockFile.root
-            then rootSrc
+            if key == lockFile.root then rootSrc
+            else if node.locked.type == "path" && builtins.substring 0 1 node.locked.path != "/"
+            then
+              parentNode.sourceInfo // {
+                outPath = parentNode.sourceInfo.outPath + ("/" + flakeDir);
+              }
             else fetchTree (node.info or {} // removeAttrs node.locked ["dir"]);
 
           subdir = if key == lockFile.root then "" else node.locked.dir or "";
@@ -170,7 +185,7 @@ let
           flake = import (outPath + "/flake.nix");
 
           inputs = builtins.mapAttrs
-            (inputName: inputSpec: allNodes.${resolveInput inputSpec})
+            (inputName: inputSpec: allNodes.${resolveInput inputSpec}.result)
             (node.inputs or {});
 
           # Resolve a input spec into a node name. An input spec is
@@ -210,11 +225,16 @@ let
             };
 
         in
-          if node.flake or true then
-            assert builtins.isFunction flake.outputs;
-            result
-          else
-            sourceInfo
+        {
+          result =
+            if node.flake or true then
+              assert builtins.isFunction flake.outputs;
+              result
+            else
+              sourceInfo;
+
+          inherit flakeDir sourceInfo;
+        }
       )
       lockFile.nodes;
 
@@ -224,7 +244,7 @@ let
     else if lockFile.version == 4
     then callFlake4 rootSrc (lockFile.inputs)
     else if lockFile.version >= 5 && lockFile.version <= 7
-    then allNodes.${lockFile.root}
+    then allNodes.${lockFile.root}.result
     else throw "lock file '${lockFilePath}' has unsupported version ${toString lockFile.version}";
 
 in
